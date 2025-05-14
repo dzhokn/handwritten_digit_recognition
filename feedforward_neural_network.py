@@ -78,11 +78,11 @@ class NeuralNetwork:
         for l in range(self.L - 1):
             one_hot_Y = self.__one_hot(Y)
             m = one_hot_Y.shape[0]
-            dZ = A[l+1] - one_hot_Y
-            dw.append(dZ @ A[l].T / m)
-            db.append(np.sum(dZ) / m)
+            dZ = A[l+1] - one_hot_Y     # Cost function: Measure the error between the predicted output and the expected output
+            dw.append(dZ @ A[l].T / m)  # The gradient of the cost function with respect to the weights
+            db.append(np.sum(dZ) / m)   # The gradient of the cost function with respect to the biases
         return dw, db
-    
+
     def __update_parameters(self, dw: list[np.ndarray], db: list[np.ndarray], alpha: float):
         '''Updates the parameters of the neural network (weights and biases) using gradient descent.'''
         for l in range(self.L - 1):
