@@ -1,5 +1,5 @@
 # Handwritten Digit Recognition
-In this project a simple feedforward neural network is developed from scratch (without PyTorch or TensorFlow). The project contains the code and data needed for training the model to recognize handwritten digits with 90% accuracy.
+In this project a simple `feedforward neural network` is developed from scratch (without `PyTorch` or `TensorFlow`). The project contains the code and data needed for training the neural network with `backpropagation` to recognize handwritten digits with 90% accuracy.
 
 Better results could be achieved with:
  - different size of the hidden layer
