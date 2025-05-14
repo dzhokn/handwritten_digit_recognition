@@ -3,7 +3,7 @@ In this project a simple `feedforward neural network` is developed from scratch 
 
 Better results could be achieved with:
  - different size of the hidden layer
- - extra activation functions (e.g. softmax() to be used on the final layer)
+ - extra activation functions (e.g. `softmax()` to be used on the final layer)
  - randomization of the training set
 
 Feel free to play with these recommendations on your own. :)
