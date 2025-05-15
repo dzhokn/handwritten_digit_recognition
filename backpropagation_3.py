@@ -9,6 +9,8 @@ class NeuralNetwork:
     '''
     w: list[np.ndarray] = []    # The weights of the network
     b: list[np.ndarray] = []    # The biases of the network
+    z: list[np.ndarray] = []    # The linear transformations of the input data
+    a: list[np.ndarray] = []    # The activations of the network
     layers: list[int]   = []    # The number of neurons in each layer
     L: int = 0                  # The number of layers in the network
 
@@ -28,6 +30,10 @@ class NeuralNetwork:
     def __ReLU(self, Z: np.ndarray) -> np.ndarray:
         '''Applies the ReLU activation function to the input'''
         return np.maximum(Z, 0)
+    
+    def __ReLU_derivative(self, Z: np.ndarray) -> np.ndarray:
+        '''Computes the derivative of the ReLU activation function'''
+        return Z > 0
 
     def __forward_prop(self, X: np.ndarray) -> list[np.ndarray]:
         '''
@@ -39,13 +45,13 @@ class NeuralNetwork:
         Returns:
             A (list[np.ndarray]): The outputs of the activation functions for each layer
         '''
-        A = [X.T] # The input data is transposed to be a column vector
+        self.z = []
+        self.a = [X.T] # The input data is transposed to be a column vector
 
         for l in range(1, self.L):
-            z = self.b[l-1] + self.w[l-1] @ A[l-1]  # Linear transformation of the input data
-            A.append(self.__ReLU(z))                # Apply an activation function to make the output non-linear
-
-        return A
+            z = self.b[l-1] + self.w[l-1] @ self.a[l-1]  # Linear transformation of the input data
+            self.z.append(z)
+            self.a.append(self.__ReLU(z))                # Apply an activation function to make the output non-linear
     
     def __one_hot(self, Y: np.ndarray) -> np.ndarray:
         '''
@@ -61,7 +67,7 @@ class NeuralNetwork:
         one_hot_Y[np.arange(Y.size), Y] = 1                 # For each observation, set the value of the one-hot vector to 1 at the index of the label
         return one_hot_Y.T                                  # Transpose the one-hot encoded labels to be a column vector
 
-    def __backward_prop(self, A: list[np.ndarray], Y: np.ndarray) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    def __backward_prop(self, Y: np.ndarray, X: np.ndarray) -> tuple[list[np.ndarray], list[np.ndarray]]:
         '''
         Performs backward propagation
 
@@ -75,12 +81,25 @@ class NeuralNetwork:
         '''
         dw = []
         db = []
+        dz = []
+
+        # Let's start by computing the error between the predicted output and the expected output
+        one_hot_Y = self.__one_hot(Y)
+        m = one_hot_Y.shape[0]
+
+        # Let's calculate the dZ for each layer starting from the last layer.
+        dz.append(self.a[-1] - one_hot_Y)
+        for l in range(self.L - 2):
+            # dZ1 = (w2.T @ dZ2) * deriv_ReLU(z1)
+            dz.append(self.w[-l-1].T @ dz[l] * self.__ReLU_derivative(self.z[-l-2]))
+        # Reverse the order of the dZs, so they are in the same order as the weights and biases (from start to end)
+        dz.reverse()
+
+        # Let's calculate the gradients of the weights and biases
         for l in range(self.L - 1):
-            one_hot_Y = self.__one_hot(Y)
-            m = one_hot_Y.shape[0]
-            dZ = A[l+1] - one_hot_Y     # Cost function: Measure the error between the predicted output and the expected output
-            dw.append(dZ @ A[l].T / m)  # The gradient of the cost function with respect to the weights
-            db.append(np.sum(dZ) / m)   # The gradient of the cost function with respect to the biases
+            dw.append(dz[l] @ self.a[l].T / m)  # The gradient of the cost function with respect to the weights
+            db.append(np.sum(dz[l]) / m)   # The gradient of the cost function with respect to the biases
+
         return dw, db
 
     def __update_parameters(self, dw: list[np.ndarray], db: list[np.ndarray], alpha: float):
@@ -89,7 +108,7 @@ class NeuralNetwork:
             self.w[l] = self.w[l] - alpha * dw[l]
             self.b[l] = self.b[l] - alpha * db[l]
 
-    def __get_accuracy(self, A: list[np.ndarray], Y: np.ndarray) -> float:
+    def __get_accuracy(self, Y: np.ndarray) -> float:
         '''
         Calculates the accuracy of the model based on the expected outputs (labels) and the predicted outputs (activations)
 
@@ -100,7 +119,7 @@ class NeuralNetwork:
         Returns:
             float: The accuracy of the model - a number between 0 and 1 (the percentage of correct predictions)
         '''
-        predictions = np.argmax(A[-1], axis=0) # Get the index of the maximum value in the output layer (1 means the model predicts the digit 1, 2 means the model predicts the digit 2, etc.)
+        predictions = np.argmax(self.a[-1], axis=0) # Get the index of the maximum value in the output layer (1 means the model predicts the digit 1, 2 means the model predicts the digit 2, etc.)
         return np.sum(predictions == Y) / Y.size # Calculate the accuracy of the model on the training data
 
     def measure_final_accuracy_on_test_data(self, X: np.ndarray, Y: np.ndarray) -> float:
@@ -114,8 +133,8 @@ class NeuralNetwork:
         Returns:
             float: The accuracy of the model - a number between 0 and 1 (the percentage of correct predictions)
         '''
-        A = self.__forward_prop(X)
-        return self.__get_accuracy(A, Y)
+        self.__forward_prop(X)
+        return self.__get_accuracy(Y)
 
     def gradient_descent(self, X: np.ndarray, Y: np.ndarray, alpha: float, num_iters: int):
         '''
@@ -128,12 +147,12 @@ class NeuralNetwork:
             num_iters (int): The number of iterations to run the gradient descent
         '''
         for i in range(num_iters):
-            A = self.__forward_prop(X)
-            dw, db = self.__backward_prop(A, Y)
+            self.__forward_prop(X)
+            dw, db = self.__backward_prop(Y, X)
             self.__update_parameters(dw, db, alpha)
             # Print the accuracy of the model on the training data
             if i % 50 == 0:
-                print(f"\tIteration #{i} accuracy: {round(self.__get_accuracy(A, Y), 4)}")
+                print(f"\tIteration #{i} accuracy: {round(self.__get_accuracy(Y), 4)}")
 
 def main():
     # Unpack the archive.zip file, if it is not already unpacked
@@ -156,10 +175,10 @@ def main():
     Y = np.asarray(Y, dtype="int32")
 
     # Initialize the neural network
-    nn = NeuralNetwork([784, 10, 10])
+    nn = NeuralNetwork([784, 20, 16, 10])
 
     # Perform gradient descent on the model
-    learning_rate = 0.00003
+    learning_rate = 0.00005
     iterations = 1000
     print(f"2. Running gradient descent for {iterations} iterations with a learning rate of {learning_rate}...")
     nn.gradient_descent(X, Y, learning_rate, iterations)
